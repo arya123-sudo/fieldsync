@@ -9,10 +9,25 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fieldsync
+        ports:
+          - 8095:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fieldsync"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       VERSION: '4.0.4'
-      SERVERPOD_PASSWORD_database: 'cpp6QrB0ma3oXmJLR1xDGci6lOM9-d2H'
-      SERVERPOD_PASSWORD_redis: 'xsatnQehpN6WSzgaqetKoZe1SI2axbIx'
+      SERVERPOD_PASSWORD_database: postgres
 
     steps:
       - uses: actions/checkout@v4
@@ -21,15 +36,12 @@ jobs:
         with:
           flutter-version: '3.44.4'
 
-
       - name: Install dependencies
         run: flutter pub get
 
       - name: Install Serverpod CLI
         run: |
           dart install serverpod_cli@$VERSION
-          # `dart install` puts executables in the Dart data home, which is not
-          # on the PATH of a GitHub runner.
           echo "${XDG_STATE_HOME:-$HOME/.local/state}/Dart/install/bin" >> "$GITHUB_PATH"
 
       - name: Run Serverpod generator
