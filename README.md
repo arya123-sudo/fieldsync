@@ -6,6 +6,10 @@ FieldSync is an offline-first maintenance coordination app for field teams. Supe
 
 Built for the [Build Something Real: The Serverpod Hackathon](https://builderbase.com/event/build-something-real-the-serverpod-hackathon).
 
+## Live demo
+
+**https://fieldsync.serverpod.space/app/** — try it now, no setup needed.
+
 ## Why it exists
 
 Field workers don't stop working when the internet does. In factories, rural sites, basements, and remote installations, connectivity is a luxury â€” but the job isn't. FieldSync treats offline as the normal case, not the exception: every task, note, and status change is written to a local CRDT-backed database first, then merged with the team when a connection returns. No spinners, no "retry" buttons, no lost work.
