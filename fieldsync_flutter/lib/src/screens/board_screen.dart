@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:serverpod_client/serverpod_client.dart';
 import 'package:fieldsync_client/fieldsync_client.dart';
 
 import '../sync/demo_ids.dart';
@@ -52,7 +51,9 @@ class _BoardScreenState extends State<BoardScreen> {
     try {
       final conn = await Connectivity().checkConnectivity();
       _sync.online = !conn.contains(ConnectivityResult.none);
-      await _sync.init(me: _me);
+      await _sync.init(
+        me: demoSupervisorId,
+      ); // Sync always as supervisor; toggle only filters UI.
       _sync.startStreaming();
       setState(() => _ready = true);
       unawaited(_restoreAndUploadPendingPhotos());
@@ -155,37 +156,43 @@ class _BoardScreenState extends State<BoardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Assign task'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                key: const ValueKey('task_title'),
-                controller: titleCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Title (e.g. Inspect transformer #42)',
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+        content: SizedBox(
+          width: 400,
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    key: const ValueKey('task_title'),
+                    controller: titleCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Title (e.g. Inspect transformer #42)',
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  TextFormField(
+                    key: const ValueKey('task_notes'),
+                    controller: notesCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes (optional)',
+                    ),
+                  ),
+                  TextFormField(
+                    key: const ValueKey('task_escalation_minutes'),
+                    controller: minutesCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Escalate if not started within (minutes)',
+                      hintText: 'Use 2 for the demo',
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
               ),
-              TextFormField(
-                key: const ValueKey('task_notes'),
-                controller: notesCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                ),
-              ),
-              TextFormField(
-                key: const ValueKey('task_escalation_minutes'),
-                controller: minutesCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Escalate if not started within (minutes)',
-                  hintText: 'Use 2 for the demo',
-                ),
-                keyboardType: TextInputType.number,
-              ),
-            ],
+            ),
           ),
         ),
         actions: [
@@ -196,7 +203,9 @@ class _BoardScreenState extends State<BoardScreen> {
           FilledButton(
             key: const ValueKey('submit_task'),
             onPressed: () {
-              if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx, true);
+              }
             },
             child: const Text('Assign'),
           ),
@@ -242,6 +251,7 @@ class _BoardScreenState extends State<BoardScreen> {
         title: const Text('Add note'),
         content: TextField(
           controller: ctrl,
+          autofocus: true,
           decoration: const InputDecoration(hintText: 'e.g. Voltage: 231V'),
         ),
         actions: [
@@ -521,7 +531,7 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
                 msg,
                 height: 140,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     const Text('Photo unavailable offline'),
               ),
             )

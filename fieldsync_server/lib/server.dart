@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'package:serverpod/serverpod.dart' hide Serverpod;
 
+import 'package:serverpod/serverpod.dart' as serverpod;
 import 'package:serverpod_cloud_storage/serverpod_cloud_storage.dart';
 import 'package:serverpod_offline_sync_server/serverpod_offline_sync_server.dart';
 
 import 'src/cache_busting.dart';
 import 'src/generated/protocol.dart';
 import 'src/generated/serverpod.dart';
+import 'src/util/demo_ids.dart';
 import 'src/web/routes/app_config_route.dart';
 import 'src/web/routes/root.dart';
 
@@ -15,10 +18,30 @@ void run(List<String> args) async {
   // with your project's generated code.
   //
   // The offlineSyncDatabaseInterceptor wraps every session database in a
-  // CRDT-aware layer so the offline sync engine tracks changes on sync tables.
+  // CRDT-aware layer so the offline sync engine tracks changes on
+  // sync tables.
+  //
+  // Demo auth: the offline-sync stream endpoint requires login, but this
+  // demo has no auth system. The token IS the user UUID — the handler
+  // accepts the two demo identities so the sync stream can authenticate.
+  // TODO: replace with serverpod_auth before production use.
   final pod = Serverpod(
     args,
     databaseInterceptor: offlineSyncDatabaseInterceptor,
+    authenticationHandler: (session, token) async {
+      print('CUSTOM AUTH HANDLER CALLED: token=$token');
+      try {
+        final userId = serverpod.UuidValue.withValidation(token);
+        if (userId == demoSupervisorId || userId == demoWorkerId) {
+          return serverpod.AuthenticationInfo(
+            userId.toString(),
+            const <serverpod.Scope>{},
+            authId: 'demo-${userId.toString()}',
+          );
+        }
+      } catch (_) {}
+      return null;
+    },
   );
 
   // Configure the CRDT sync engine with our sync tables. Must run before any

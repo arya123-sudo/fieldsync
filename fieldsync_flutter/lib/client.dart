@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:fieldsync_client/fieldsync_client.dart';
+import 'package:serverpod_client/serverpod_client.dart';
 import 'package:serverpod_flutter/serverpod_flutter.dart';
+
+import 'src/sync/demo_ids.dart';
 
 // When you are running the app on a physical device, you need to set the
 // server URL to the IP address of your computer. You can find the IP
@@ -23,7 +26,20 @@ final serverUrl = getServerUrl();
 /// instead of using a global client object. This is just a simple example.
 late final Client client;
 
+/// Demo auth: the offline-sync stream endpoint requires login, but this demo
+/// has no auth system. We send the demo supervisor UUID as a Bearer token;
+/// the server's authenticationHandler accepts the two demo UUIDs.
+/// Sync always runs as supervisor; the supervisor/worker toggle only
+/// filters the UI.
+// TODO: replace with serverpod_auth before production use.
+class _DemoAuthKeyProvider implements ClientAuthKeyProvider {
+  @override
+  Future<String?> get authHeaderValue async =>
+      wrapAsBearerAuthHeaderValue(demoSupervisorId.toString());
+}
+
 Future<void> initializeClient() async {
   client = Client(await serverUrl)
-    ..connectivityMonitor = FlutterConnectivityMonitor();
+    ..connectivityMonitor = FlutterConnectivityMonitor()
+    ..authKeyProvider = _DemoAuthKeyProvider();
 }
