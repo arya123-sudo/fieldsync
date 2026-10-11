@@ -20,10 +20,12 @@ class SetupEndpoint extends Endpoint {
         );
       }
     }
-    final spaceUuid = await session.offlineSync.spaces.create(grants: {
-      demoSupervisorId: OfflineSyncSpaceRole.readWrite,
-      demoWorkerId: OfflineSyncSpaceRole.readWrite,
-    });
+    final spaceUuid = await session.offlineSync.spaces.create(
+      grants: {
+        demoSupervisorId: OfflineSyncSpaceRole.readWrite,
+        demoWorkerId: OfflineSyncSpaceRole.readWrite,
+      },
+    );
     await AppConfig.db.insertRow(
       session,
       AppConfig(key: 'demo_team_space', value: spaceUuid.toString()),
