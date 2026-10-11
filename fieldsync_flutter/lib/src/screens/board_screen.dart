@@ -8,7 +8,18 @@ import 'package:fieldsync_client/fieldsync_client.dart';
 
 import '../sync/demo_ids.dart';
 import '../sync/sync_service.dart';
-import '../widgets/sync_badge.dart';
+
+// ── Design tokens ──────────────────────────────────────────────
+const _sidebarBg = Color(0xFF161D33);
+const _sidebarFg = Color(0xFFE8ECF5);
+const _sidebarMuted = Color(0xFF8E97B8);
+const _pageBg = Color(0xFFF3F5FA);
+const _ink = Color(0xFF161D33);
+const _inkSoft = Color(0xFF626B8A);
+const _accent = Color(0xFF4F6DF5);
+const _online = Color(0xFF16A34A);
+const _offline = Color(0xFFDC2626);
+const _amber = Color(0xFFD97706);
 
 class BoardScreen extends StatefulWidget {
   final Client client;
@@ -28,8 +39,8 @@ class _BoardScreenState extends State<BoardScreen> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   bool _syncing = false;
   DateTime? _lastSynced;
-  final Map<String, Uint8List> _pendingPhotos = {}; // eventKey -> bytes
-  final Map<String, UuidValue> _eventTask = {}; // eventKey -> taskId
+  final Map<String, Uint8List> _pendingPhotos = {};
+  final Map<String, UuidValue> _eventTask = {};
 
   UuidValue get _me => _isSupervisor ? demoSupervisorId : demoWorkerId;
 
@@ -38,22 +49,17 @@ class _BoardScreenState extends State<BoardScreen> {
     super.initState();
     _sync = SyncService(widget.client);
     _boot();
-    _connectivitySub = Connectivity().onConnectivityChanged.listen(
-      _onConnectivity,
-    );
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 3),
-      (_) => _reload(),
-    );
+    _connectivitySub =
+        Connectivity().onConnectivityChanged.listen(_onConnectivity);
+    _refreshTimer =
+        Timer.periodic(const Duration(seconds: 3), (_) => _reload());
   }
 
   Future<void> _boot() async {
     try {
       final conn = await Connectivity().checkConnectivity();
       _sync.online = !conn.contains(ConnectivityResult.none);
-      await _sync.init(
-        me: demoSupervisorId,
-      ); // Sync always as supervisor; toggle only filters UI.
+      await _sync.init(me: demoSupervisorId);
       _sync.startStreaming();
       setState(() => _ready = true);
       unawaited(_restoreAndUploadPendingPhotos());
@@ -65,24 +71,19 @@ class _BoardScreenState extends State<BoardScreen> {
   Future<void> _reload() async {
     if (!_ready && _error == null) return;
     try {
-      final tasks = await _sync.fetchTasks().timeout(
-        const Duration(seconds: 8),
-      );
+      final tasks =
+          await _sync.fetchTasks().timeout(const Duration(seconds: 8));
       if (mounted) setState(() => _tasks = tasks);
-    } catch (_) {
-      // keep old list while offline
-    }
+    } catch (_) {}
   }
 
   Future<void> _restoreAndUploadPendingPhotos() async {
     try {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 500));
       await _restorePendingPhotos();
       if (_sync.online) await _uploadPendingPhotos();
       await _reload();
-    } catch (_) {
-      // Keep the board usable; the next connectivity/reload cycle retries.
-    }
+    } catch (_) {}
   }
 
   Future<void> _onConnectivity(List<ConnectivityResult> results) async {
@@ -117,7 +118,8 @@ class _BoardScreenState extends State<BoardScreen> {
       );
       final events = await _sync.fetchEvents(taskId);
       for (final ev in events) {
-        if (ev.kind == 'photo_pending' && ev.message.startsWith('$eventKey|')) {
+        if (ev.kind == 'photo_pending' &&
+            ev.message.startsWith('$eventKey|')) {
           ev.kind = 'photo';
           ev.message = url;
           await _sync.updateEvent(ev);
@@ -169,23 +171,27 @@ class _BoardScreenState extends State<BoardScreen> {
                     controller: titleCtrl,
                     autofocus: true,
                     decoration: const InputDecoration(
-                      labelText: 'Title (e.g. Inspect transformer #42)',
+                      labelText:
+                          'Title (e.g. Inspect transformer #42)',
                     ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) => (v == null ||
+                            v.trim().isEmpty)
+                        ? 'Required'
+                        : null,
                   ),
                   TextFormField(
                     key: const ValueKey('task_notes'),
                     controller: notesCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Notes (optional)',
-                    ),
+                        labelText: 'Notes (optional)'),
                   ),
                   TextFormField(
-                    key: const ValueKey('task_escalation_minutes'),
+                    key: const ValueKey(
+                        'task_escalation_minutes'),
                     controller: minutesCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Escalate if not started within (minutes)',
+                      labelText:
+                          'Escalate if not started within (minutes)',
                       hintText: 'Use 2 for the demo',
                     ),
                     keyboardType: TextInputType.number,
@@ -217,22 +223,26 @@ class _BoardScreenState extends State<BoardScreen> {
       await widget.client.task.createTask(
         title: titleCtrl.text.trim(),
         assigneeId: demoWorkerId,
-        notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+        notes: notesCtrl.text.trim().isEmpty
+            ? null
+            : notesCtrl.text.trim(),
         teamSpaceId: _sync.teamSpaceId!,
         actorId: _me,
-        escalationAfterMinutes: int.tryParse(minutesCtrl.text) ?? 30,
+        escalationAfterMinutes:
+            int.tryParse(minutesCtrl.text) ?? 30,
       );
       await _reload();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Assign failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Assign failed: $e')),
+        );
       }
     }
   }
 
-  Future<void> _setStatus(Task task, String status, String eventKind) async {
+  Future<void> _setStatus(
+      Task task, String status, String eventKind) async {
     task.status = status;
     await _sync.updateTask(task);
     await _sync.addEvent(
@@ -252,7 +262,8 @@ class _BoardScreenState extends State<BoardScreen> {
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'e.g. Voltage: 231V'),
+          decoration: const InputDecoration(
+              hintText: 'e.g. Voltage: 231V'),
         ),
         actions: [
           TextButton(
@@ -260,42 +271,45 @@ class _BoardScreenState extends State<BoardScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            onPressed: () =>
+                Navigator.pop(ctx, ctrl.text.trim()),
             child: const Text('Save'),
           ),
         ],
       ),
     );
     if (text == null || text.isEmpty) return;
-    await _sync.addEvent(taskId: task.id!, kind: 'note', message: text);
+    await _sync.addEvent(
+        taskId: task.id!, kind: 'note', message: text);
     await _reload();
   }
 
   Future<void> _attachPhoto(Task task) async {
-    final XFile? picked = await ImagePicker().pickImage(
-      source: ImageSource.camera,
-    );
-    final XFile? file =
-        picked ?? await ImagePicker().pickImage(source: ImageSource.gallery);
+    final XFile? picked = await ImagePicker()
+        .pickImage(source: ImageSource.camera);
+    final XFile? file = picked ??
+        await ImagePicker()
+            .pickImage(source: ImageSource.gallery);
     if (file == null) return;
     final bytes = await file.readAsBytes();
     if (_sync.online) {
       try {
-        final url = await widget.client.task.uploadEvidencePhoto(
+        final url =
+            await widget.client.task.uploadEvidencePhoto(
           bytes.buffer.asByteData(),
           file.name,
         );
-        await _sync.addEvent(taskId: task.id!, kind: 'photo', message: url);
+        await _sync.addEvent(
+            taskId: task.id!, kind: 'photo', message: url);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Upload failed: $e')),
+          );
         }
         return;
       }
     } else {
-      // Offline: record immediately, upload the bytes on reconnect.
       final eventKey = UniqueKey().toString();
       await _sync.savePendingPhoto(eventKey, bytes);
       _eventTask[eventKey] = task.id!;
@@ -317,47 +331,834 @@ class _BoardScreenState extends State<BoardScreen> {
     super.dispose();
   }
 
+  // ── Helpers ────────────────────────────────────────────────
+
   Color _statusColor(String s) => switch (s) {
-    'completed' => Colors.green.shade700,
-    'in_progress' => Colors.blue.shade700,
-    'escalated' => Colors.red.shade700,
-    'overdue' => Colors.orange.shade800,
-    _ => Colors.grey.shade700,
-  };
+        'completed' => const Color(0xFF16A34A),
+        'in_progress' => const Color(0xFF2563EB),
+        'escalated' => const Color(0xFFDC2626),
+        'overdue' => const Color(0xFFD97706),
+        _ => const Color(0xFF64748B),
+      };
+
+  String _statusLabel(String s) => switch (s) {
+        'in_progress' => 'In Progress',
+        _ => s.replaceAll('_', ' ').split(' ').map((w) =>
+            w.isEmpty
+                ? w
+                : '${w[0].toUpperCase()}${w.substring(1)}').join(' '),
+      };
+
+  /// Priority derived from urgency — no model change needed.
+  String _priority(Task t) => switch (t.status) {
+        'escalated' || 'overdue' => 'High',
+        'in_progress' => 'Medium',
+        _ => 'Low',
+      };
+
+  Color _priorityColor(String p) => switch (p) {
+        'High' => const Color(0xFFDC2626),
+        'Medium' => const Color(0xFFD97706),
+        _ => const Color(0xFF16A34A),
+      };
+
+  Color _priorityBg(String p) => switch (p) {
+        'High' => const Color(0xFFFDECEC),
+        'Medium' => const Color(0xFFFEF3E2),
+        _ => const Color(0xFFE8F7EE),
+      };
 
   String _fmtTime(DateTime t) {
     final l = t.toLocal();
     return '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget _taskTile(Task task) {
-    final mine = task.assigneeId == _me;
-    return Card(
-      child: ListTile(
-        title: Text(
-          task.title,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+  String _assigneeName(UuidValue? id) {
+    if (id == demoWorkerId) return 'Field Worker';
+    if (id == demoSupervisorId) return 'Supervisor';
+    return 'Unassigned';
+  }
+
+  // ── Sidebar ────────────────────────────────────────────────
+
+  Widget _buildSidebar() {
+    return Container(
+      width: 264,
+      color: _sidebarBg,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding:
+                  const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: _accent,
+                      borderRadius:
+                          BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                        Icons.sync_rounded,
+                        color: Colors.white,
+                        size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text('FieldSync',
+                          style: TextStyle(
+                              color: _sidebarFg,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3)),
+                      Text(
+                          'Work anywhere. Sync everything.',
+                          style: TextStyle(
+                              color: _sidebarMuted,
+                              fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Padding(
+              padding:
+                  EdgeInsets.symmetric(horizontal: 20),
+              child: Text('WORKSPACE',
+                  style: TextStyle(
+                      color: _sidebarMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2)),
+            ),
+            const SizedBox(height: 6),
+            _navItem(
+                Icons.dashboard_outlined,
+                'Task board',
+                true),
+            _navItem(Icons.group_outlined, 'Team',
+                false),
+            _navItem(Icons.history_outlined,
+                'Activity', false),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white
+                      .withValues(alpha: 0.08),
+                  borderRadius:
+                      BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    _roleChip(
+                        true,
+                        Icons
+                            .manage_accounts_outlined,
+                        'Supervisor'),
+                    _roleChip(false,
+                        Icons.handyman_outlined,
+                        'Worker'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Connection status footer — offline-first highlight
+            Container(
+              margin:
+                  const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white
+                    .withValues(alpha: 0.06),
+                borderRadius:
+                    BorderRadius.circular(12),
+                border: Border.all(
+                    color: Colors.white
+                        .withValues(alpha: 0.10)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _sync.online
+                          ? _online
+                          : _offline,
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_sync.online
+                                  ? _online
+                                  : _offline)
+                              .withValues(alpha: 0.6),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _sync.online
+                              ? 'Online'
+                              : 'Offline',
+                          style: const TextStyle(
+                              color: _sidebarFg,
+                              fontSize: 13,
+                              fontWeight:
+                                  FontWeight.w600),
+                        ),
+                        Text(
+                          _sync.online
+                              ? _syncing
+                                  ? 'Syncing changes…'
+                                  : 'Everything up to date'
+                              : '${_sync.pendingWrites} change${_sync.pendingWrites == 1 ? '' : 's'} queued locally',
+                          style: const TextStyle(
+                              color: _sidebarMuted,
+                              fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_syncing)
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child:
+                          CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white70),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
-        subtitle: Text(
-          'Updated ${_fmtTime(task.updatedAt)}${mine ? ' · assigned to you' : ''}',
+      ),
+    );
+  }
+
+  Widget _navItem(
+      IconData icon, String label, bool active) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+          horizontal: 12, vertical: 2),
+      child: Container(
+        decoration: BoxDecoration(
+          color: active
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.transparent,
+          borderRadius:
+              BorderRadius.circular(10),
         ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: ListTile(
+          dense: true,
+          leading: Icon(icon,
+              color: active
+                  ? Colors.white
+                  : _sidebarMuted,
+              size: 20),
+          title: Text(label,
+              style: TextStyle(
+                  color: active
+                      ? Colors.white
+                      : _sidebarMuted,
+                  fontSize: 14,
+                  fontWeight: active
+                      ? FontWeight.w600
+                      : FontWeight.w400)),
+          onTap: () {},
+        ),
+      ),
+    );
+  }
+
+  Widget _roleChip(
+      bool value, IconData icon, String label) {
+    final selected = _isSupervisor == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () =>
+            setState(() => _isSupervisor = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+              horizontal: 8, vertical: 9),
           decoration: BoxDecoration(
-            color: _statusColor(task.status).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _statusColor(task.status)),
+            color:
+                selected ? _accent : Colors.transparent,
+            borderRadius:
+                BorderRadius.circular(9),
           ),
-          child: Text(
-            task.status.replaceAll('_', ' ').toUpperCase(),
-            style: TextStyle(
-              color: _statusColor(task.status),
-              fontWeight: FontWeight.bold,
-              fontSize: 11,
+          child: Row(
+            mainAxisAlignment:
+                MainAxisAlignment.center,
+            children: [
+              Icon(icon,
+                  size: 15,
+                  color: selected
+                      ? Colors.white
+                      : _sidebarMuted),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      color: selected
+                          ? Colors.white
+                          : _sidebarMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Header + stats ─────────────────────────────────────────
+
+  Widget _buildHeader() {
+    return Container(
+      color: Colors.white,
+      padding:
+          const EdgeInsets.fromLTRB(28, 22, 28, 18),
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _isSupervisor
+                          ? 'Operations board'
+                          : 'My assignments',
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: _ink,
+                          letterSpacing: -0.5),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Assign work, track field progress, review evidence — online or off.',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: _inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+              _syncStatusPill(),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _statCard(
+                  'Open',
+                  _count('open'),
+                  const Color(0xFF64748B),
+                  Icons.radio_button_unchecked),
+              const SizedBox(width: 12),
+              _statCard(
+                  'In progress',
+                  _count('in_progress'),
+                  const Color(0xFF2563EB),
+                  Icons.timelapse_outlined),
+              const SizedBox(width: 12),
+              _statCard(
+                  'Completed',
+                  _count('completed'),
+                  const Color(0xFF16A34A),
+                  Icons.check_circle_outline),
+              const SizedBox(width: 12),
+              _statCard(
+                  'Needs attention',
+                  _count('escalated') +
+                      _count('overdue'),
+                  const Color(0xFFDC2626),
+                  Icons.warning_amber_outlined),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _count(String status) =>
+      _tasks.where((t) => t.status == status).length;
+
+  Widget _statCard(String label, int value,
+      Color color, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: _pageBg,
+          borderRadius:
+              BorderRadius.circular(14),
+          border: Border.all(
+              color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: _sidebarBg,
+                borderRadius:
+                    BorderRadius.circular(10),
+              ),
+              child: Icon(icon,
+                  color: Colors.white, size: 19),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text('$value',
+                    style: const TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        color: _ink,
+                        height: 1.1)),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: _inkSoft)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Offline-first hero: connection, queue, and sync progress.
+  Widget _syncStatusPill() {
+    final online = _sync.online;
+    final pending = _sync.pendingWrites;
+    final Color dot = !online
+        ? _offline
+        : (_syncing || pending > 0 ? _amber : _online);
+    final String label = !online
+        ? 'Offline'
+        : (_syncing
+            ? 'Syncing…'
+            : (pending > 0
+                ? '$pending pending'
+                : 'Synced'));
+    final String sub = !online
+        ? 'Saving on this device'
+        : (_lastSynced != null
+            ? 'Last sync ${_fmtTime(_lastSynced!)}'
+            : 'Live');
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: dot.withValues(alpha: 0.10),
+        borderRadius:
+            BorderRadius.circular(14),
+        border: Border.all(
+            color: dot.withValues(alpha: 0.35),
+            width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_syncing)
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: dot),
+            )
+          else
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dot),
+            ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: dot,
+                      height: 1.1)),
+              Text(sub,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: _inkSoft,
+                      height: 1.2)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _offlineBanner() {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFEF3C7),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 28, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_outlined,
+              size: 17,
+              color: Color(0xFFB45309)),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              "You're offline — every change is saved on this device and syncs automatically on reconnect.",
+              style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF92400E),
+                  fontWeight: FontWeight.w500),
             ),
           ),
-        ),
+          if (_sync.pendingWrites > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB45309),
+                borderRadius:
+                    BorderRadius.circular(20),
+              ),
+              child: Text(
+                '${_sync.pendingWrites} queued',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Kanban ─────────────────────────────────────────────────
+
+  Widget _buildKanban(List<Task> visible) {
+    final urgent = visible
+        .where((t) =>
+            t.status == 'escalated' ||
+            t.status == 'overdue')
+        .toList();
+    final open = visible
+        .where((t) => t.status == 'open')
+        .toList();
+    // Urgent tasks float to the top of the Open column.
+    final openCol = [...urgent, ...open];
+    final inProgress = visible
+        .where((t) => t.status == 'in_progress')
+        .toList();
+    final done = visible
+        .where((t) => t.status == 'completed')
+        .toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          28, 18, 28, 18),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          _kanbanColumn(
+              'Open', openCol, const Color(0xFFDC2626),
+              flex: 1),
+          const SizedBox(width: 16),
+          _kanbanColumn('In Progress', inProgress,
+              const Color(0xFFD97706),
+              flex: 1),
+          const SizedBox(width: 16),
+          _kanbanColumn('Completed', done,
+              const Color(0xFF16A34A),
+              flex: 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _kanbanColumn(
+      String title, List<Task> tasks, Color dot,
+      {required int flex}) {
+    return Expanded(
+      flex: flex,
+      child: Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(
+                left: 4, bottom: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: dot),
+                ),
+                const SizedBox(width: 8),
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _ink)),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2),
+                  decoration: BoxDecoration(
+                    color:
+                        Colors.grey.shade200,
+                    borderRadius:
+                        BorderRadius.circular(12),
+                  ),
+                  child: Text('${tasks.length}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.w700,
+                          color: _inkSoft)),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: tasks.isEmpty
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white
+                          .withValues(alpha: 0.55),
+                      borderRadius:
+                          BorderRadius.circular(
+                              14),
+                      border: Border.all(
+                          color:
+                              Colors.grey.shade200,
+                          style: BorderStyle.none),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'No tasks',
+                        style: TextStyle(
+                            color: Colors
+                                .grey.shade400,
+                            fontSize: 13),
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: tasks.length,
+                    itemBuilder: (_, i) =>
+                        _taskCard(tasks[i]),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _taskCard(Task task) {
+    final color = _statusColor(task.status);
+    final priority = _priority(task);
+    final pColor = _priorityColor(priority);
+    final urgent = priority == 'High';
+    final mine = task.assigneeId == _me;
+    return Container(
+      margin:
+          const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(14),
+        border: Border.all(
+            color: urgent
+                ? pColor.withValues(alpha: 0.5)
+                : Colors.grey.shade200,
+            width: urgent ? 1.4 : 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius:
+            BorderRadius.circular(14),
         onTap: () => _openDetail(task),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3),
+                    decoration: BoxDecoration(
+                      color:
+                          _priorityBg(priority),
+                      borderRadius:
+                          BorderRadius.circular(
+                              6),
+                    ),
+                    child: Text(priority,
+                        style: TextStyle(
+                            color: pColor,
+                            fontSize: 11,
+                            fontWeight:
+                                FontWeight.w700)),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3),
+                    decoration: BoxDecoration(
+                      color: color.withValues(
+                          alpha: 0.10),
+                      borderRadius:
+                          BorderRadius.circular(
+                              6),
+                    ),
+                    child: Text(
+                      _statusLabel(task.status)
+                          .toUpperCase(),
+                      style: TextStyle(
+                          color: color,
+                          fontSize: 10,
+                          fontWeight:
+                              FontWeight.w800,
+                          letterSpacing: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                task.title,
+                style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                    letterSpacing: -0.2),
+              ),
+              if (task.notes?.isNotEmpty ==
+                  true) ...[
+                const SizedBox(height: 6),
+                Text(
+                  task.notes!,
+                  maxLines: 2,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      color: _inkSoft,
+                      height: 1.35),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 13,
+                    backgroundColor: mine
+                        ? _accent
+                        : Colors.grey.shade400,
+                    child: Text(
+                      _assigneeName(
+                              task.assigneeId)
+                          [0]
+                          .toUpperCase(),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight:
+                              FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      _assigneeName(
+                          task.assigneeId),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.w600,
+                          color: _inkSoft),
+                      overflow:
+                          TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(
+                      Icons.access_time_outlined,
+                      size: 13,
+                      color: _inkSoft),
+                  const SizedBox(width: 4),
+                  Text(
+                    _fmtTime(task.updatedAt),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: _inkSoft),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -366,106 +1167,137 @@ class _BoardScreenState extends State<BoardScreen> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => _TaskDetailSheet(
         task: task,
         sync: _sync,
         isWorker: !_isSupervisor,
-        onSetStatus: (s, k) => _setStatus(task, s, k),
+        onSetStatus: (s, k) =>
+            _setStatus(task, s, k),
         onAddNote: () => _addNote(task),
-        onAttachPhoto: () => _attachPhoto(task),
+        onAttachPhoto: () =>
+            _attachPhoto(task),
       ),
     );
     await _reload();
   }
 
+  // ── Build ──────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     if (_error != null && !_ready) {
       return Scaffold(
-        appBar: AppBar(title: const Text('FieldSync')),
+        appBar:
+            AppBar(title: const Text('FieldSync')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
               'Failed to start:\n$_error',
-              style: const TextStyle(color: Colors.red),
+              style:
+                  const TextStyle(color: Colors.red),
             ),
           ),
         ),
       );
     }
     if (!_ready) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+          body: Center(
+              child:
+                  CircularProgressIndicator()));
     }
+
     final visible = _isSupervisor
         ? _tasks
-        : _tasks.where((t) => t.assigneeId == _me).toList();
+        : _tasks
+            .where((t) => t.assigneeId == _me)
+            .toList();
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('FieldSync'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: SyncBadge(
-                online: _sync.online,
-                pendingWrites: _sync.pendingWrites,
-                syncing: _syncing,
-                lastSynced: _lastSynced,
-              ),
+      backgroundColor: _pageBg,
+      body: Row(
+        children: [
+          _buildSidebar(),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(),
+                if (!_sync.online)
+                  _offlineBanner(),
+                Expanded(
+                  child: visible.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize:
+                                MainAxisSize.min,
+                            children: [
+                              Icon(
+                                  Icons
+                                      .assignment_outlined,
+                                  size: 48,
+                                  color: Colors
+                                      .grey.shade300),
+                              const SizedBox(
+                                  height: 12),
+                              Text(
+                                _isSupervisor
+                                    ? 'No tasks yet — assign the first one.'
+                                    : 'No assignments yet — check back soon.',
+                                style:
+                                    const TextStyle(
+                                        color:
+                                            _inkSoft,
+                                        fontSize:
+                                            14),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () async {
+                            if (_sync.online) {
+                              await _sync
+                                  .syncOnce();
+                              _sync.pendingWrites =
+                                  0;
+                            }
+                            await _reload();
+                          },
+                          child:
+                              SingleChildScrollView(
+                            physics:
+                                const AlwaysScrollableScrollPhysics(),
+                            child: SizedBox(
+                              height:
+                                  MediaQuery.of(context)
+                                          .size
+                                          .height -
+                                      260,
+                              child: _buildKanban(
+                                  visible),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
             ),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(
-                  value: true,
-                  label: Text('Supervisor'),
-                  icon: Icon(Icons.manage_accounts_outlined),
-                ),
-                ButtonSegment(
-                  value: false,
-                  label: Text('Worker'),
-                  icon: Icon(Icons.handyman_outlined),
-                ),
-              ],
-              selected: {_isSupervisor},
-              onSelectionChanged: (s) =>
-                  setState(() => _isSupervisor = s.first),
-            ),
-          ),
-        ),
       ),
-      body: visible.isEmpty
-          ? const Center(
-              child: Text(
-                'No tasks yet — supervisors assign from the + button.',
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: () async {
-                if (_sync.online) {
-                  await _sync.syncOnce();
-                  _sync.pendingWrites = 0;
-                }
-                await _reload();
-              },
-              child: ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: visible.length,
-                itemBuilder: (_, i) => _taskTile(visible[i]),
-              ),
-            ),
       floatingActionButton: _isSupervisor
           ? FloatingActionButton.extended(
-              key: const ValueKey('assign_task'),
+              key:
+                  const ValueKey('assign_task'),
               onPressed: _assignTask,
-              icon: const Icon(Icons.add_task),
-              label: const Text('Assign task'),
+              backgroundColor: _accent,
+              icon:
+                  const Icon(Icons.add_task),
+              label:
+                  const Text('Assign task'),
             )
           : null,
     );
@@ -476,7 +1308,8 @@ class _TaskDetailSheet extends StatefulWidget {
   final Task task;
   final SyncService sync;
   final bool isWorker;
-  final Future<void> Function(String, String) onSetStatus;
+  final Future<void> Function(String, String)
+      onSetStatus;
   final Future<void> Function() onAddNote;
   final Future<void> Function() onAttachPhoto;
 
@@ -490,10 +1323,12 @@ class _TaskDetailSheet extends StatefulWidget {
   });
 
   @override
-  State<_TaskDetailSheet> createState() => _TaskDetailSheetState();
+  State<_TaskDetailSheet> createState() =>
+      _TaskDetailSheetState();
 }
 
-class _TaskDetailSheetState extends State<_TaskDetailSheet> {
+class _TaskDetailSheetState
+    extends State<_TaskDetailSheet> {
   List<TaskEvent> _events = [];
 
   @override
@@ -504,35 +1339,48 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
 
   Future<void> _load() async {
     try {
-      final events = await widget.sync.fetchEvents(widget.task.id!);
-      if (mounted) setState(() => _events = events);
+      final events = await widget.sync
+          .fetchEvents(widget.task.id!);
+      if (mounted)
+        setState(() => _events = events);
     } catch (_) {}
   }
 
-  IconData _iconFor(String kind) => switch (kind) {
-    'assigned' => Icons.assignment_ind_outlined,
-    'started' => Icons.play_arrow_outlined,
-    'note' => Icons.note_outlined,
-    'photo' => Icons.photo_outlined,
-    'photo_pending' => Icons.cloud_upload_outlined,
-    'completed' => Icons.check_circle_outline,
-    'escalated' => Icons.warning_amber_outlined,
-    _ => Icons.circle_outlined,
-  };
+  IconData _iconFor(String kind) =>
+      switch (kind) {
+        'assigned' =>
+          Icons.assignment_ind_outlined,
+        'started' =>
+          Icons.play_arrow_outlined,
+        'note' => Icons.note_outlined,
+        'photo' => Icons.photo_outlined,
+        'photo_pending' =>
+          Icons.cloud_upload_outlined,
+        'completed' =>
+          Icons.check_circle_outline,
+        'escalated' =>
+          Icons.warning_amber_outlined,
+        _ => Icons.circle_outlined,
+      };
 
   Widget _eventTile(TaskEvent e) {
-    final msg = e.message.contains('|') ? e.message.split('|').last : e.message;
+    final msg = e.message.contains('|')
+        ? e.message.split('|').last
+        : e.message;
     return ListTile(
-      leading: Icon(_iconFor(e.kind), size: 20),
+      leading:
+          Icon(_iconFor(e.kind), size: 20),
       title: e.kind == 'photo'
           ? ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius:
+                  BorderRadius.circular(8),
               child: Image.network(
                 msg,
                 height: 140,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) =>
-                    const Text('Photo unavailable offline'),
+                    const Text(
+                        'Photo unavailable offline'),
               ),
             )
           : Text(msg),
@@ -554,70 +1402,120 @@ class _TaskDetailSheetState extends State<_TaskDetailSheet> {
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.85,
-      builder: (_, ctrl) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              t.title,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Status: ${t.status.replaceAll('_', ' ')}'
-              '${t.notes?.isNotEmpty == true ? '\nNotes: ${t.notes}' : ''}',
-            ),
-            const SizedBox(height: 12),
-            if (widget.isWorker) ...[
-              Wrap(
-                spacing: 8,
-                children: [
-                  if (t.status == 'open')
-                    FilledButton.tonal(
-                      onPressed: () async {
-                        await widget.onSetStatus('in_progress', 'started');
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                      child: const Text('Start work'),
-                    ),
-                  if (t.status == 'in_progress' || t.status == 'open')
-                    FilledButton(
-                      onPressed: () async {
-                        await widget.onSetStatus('completed', 'completed');
-                        if (context.mounted) Navigator.pop(context);
-                      },
-                      child: const Text('Complete'),
-                    ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onAddNote,
-                    icon: const Icon(Icons.note_add_outlined, size: 18),
-                    label: const Text('Note'),
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(
+              top: Radius.circular(20)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color:
+                        Colors.grey.shade300,
+                    borderRadius:
+                        BorderRadius.circular(2),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onAttachPhoto,
-                    icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                    label: const Text('Photo'),
-                  ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(t.title,
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight:
+                          FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(
+                'Status: ${t.status.replaceAll('_', ' ')}'
+                '${t.notes?.isNotEmpty == true ? '\nNotes: ${t.notes}' : ''}',
               ),
               const SizedBox(height: 12),
-            ],
-            const Text(
-              'Evidence timeline',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const Divider(),
-            Expanded(
-              child: _events.isEmpty
-                  ? const Center(child: Text('No activity yet'))
-                  : ListView.builder(
-                      controller: ctrl,
-                      itemCount: _events.length,
-                      itemBuilder: (_, i) => _eventTile(_events[i]),
+              if (widget.isWorker) ...[
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (t.status == 'open')
+                      FilledButton.tonal(
+                        onPressed: () async {
+                          await widget.onSetStatus(
+                              'in_progress',
+                              'started');
+                          if (context.mounted) {
+                            Navigator.pop(
+                                context);
+                          }
+                        },
+                        child: const Text(
+                            'Start work'),
+                      ),
+                    if (t.status ==
+                            'in_progress' ||
+                        t.status == 'open')
+                      FilledButton(
+                        onPressed: () async {
+                          await widget.onSetStatus(
+                              'completed',
+                              'completed');
+                          if (context.mounted) {
+                            Navigator.pop(
+                                context);
+                          }
+                        },
+                        child: const Text(
+                            'Complete'),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed:
+                          widget.onAddNote,
+                      icon: const Icon(
+                          Icons.note_add_outlined,
+                          size: 18),
+                      label:
+                          const Text('Note'),
                     ),
-            ),
-          ],
+                    OutlinedButton.icon(
+                      onPressed:
+                          widget.onAttachPhoto,
+                      icon: const Icon(
+                          Icons
+                              .photo_camera_outlined,
+                          size: 18),
+                      label:
+                          const Text('Photo'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+              ],
+              const Text('Evidence timeline',
+                  style: TextStyle(
+                      fontWeight:
+                          FontWeight.bold)),
+              const Divider(),
+              Expanded(
+                child: _events.isEmpty
+                    ? const Center(
+                        child: Text(
+                            'No activity yet'))
+                    : ListView.builder(
+                        controller: ctrl,
+                        itemCount:
+                            _events.length,
+                        itemBuilder: (_, i) =>
+                            _eventTile(
+                                _events[i]),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
