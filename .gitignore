@@ -1,0 +1,36 @@
+# Files and directories created by pub
+.dart_tool/
+.packages
+
+# Pubspec overrides
+pubspec_overrides.yaml
+
+# Agents
+.dart_skills/
+.agents/
+.claude/
+.gemini/
+.cursor/
+.vscode/mcp.json
+.codex/
+.mcp.json
+
+# Serverpod Cloud CLI
+.scloud/
+
+config/passwords.yaml
+fieldsync_server/config/passwords.yaml
+
+# Local logs and debugging output
+start-log.txt
+*.log
+
+# Flutter generated files
+**/.dart_tool/
+**/build/
+
+# Serverpod local development data
+fieldsync_server/.serverpod/
+
+# IDE local settings
+**/.idea/

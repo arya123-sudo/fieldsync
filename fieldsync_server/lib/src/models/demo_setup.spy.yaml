@@ -1,0 +1,5 @@
+class: DemoSetup
+fields:
+  supervisorId: UuidValue
+  workerId: UuidValue
+  teamSpaceId: UuidValue

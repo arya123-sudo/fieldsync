@@ -1,0 +1,8 @@
+class: TaskEvent
+table: task_event
+database: sync
+fields:
+  taskId: UuidValue
+  kind: String
+  message: String
+  createdAt: DateTime

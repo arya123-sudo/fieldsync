@@ -1,0 +1,5 @@
+class: AppConfig
+table: app_config
+fields:
+  key: String
+  value: String

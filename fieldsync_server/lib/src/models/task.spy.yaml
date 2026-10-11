@@ -1,0 +1,10 @@
+class: Task
+table: task
+database: sync
+fields:
+  title: String
+  status: String
+  assigneeId: UuidValue?
+  notes: String?
+  photoPath: String?
+  updatedAt: DateTime

@@ -1,0 +1,14 @@
+type: server
+
+client_package_path: ../fieldsync_client
+server_test_tools_path: test/integration/test_tools
+
+features:
+  database: true
+
+modules:
+  serverpod_offline_sync:
+    nickname: offline_sync
+
+experimental_features:
+  databaseSync: true

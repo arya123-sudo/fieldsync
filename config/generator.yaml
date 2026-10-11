@@ -1,0 +1,6 @@
+﻿modules:
+  serverpod_offline_sync:
+    nickname: offline_sync
+
+experimental_features:
+  databaseSync: true

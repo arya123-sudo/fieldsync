@@ -1,0 +1,5 @@
+class: EscalationCheck
+fields:
+  taskId: UuidValue
+  teamSpaceId: UuidValue
+  actorId: UuidValue

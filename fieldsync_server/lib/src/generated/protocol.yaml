@@ -1,0 +1,7 @@
+setup:
+  - getOrCreateDemoTeam:
+task:
+  - createTask:
+  - uploadEvidencePhoto:
+greeting:
+  - hello:

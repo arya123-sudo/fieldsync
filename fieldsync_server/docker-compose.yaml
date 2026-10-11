@@ -1,0 +1,18 @@
+services:
+
+  redis:
+    image: redis:6.2.6
+    ports:
+      - "8091:6379"
+    command: redis-server --requirepass "7G1HfAu2_ghsMiSvop9F2yExuKBy7q2h"
+    environment:
+      - REDIS_REPLICATION_MODE=master
+
+
+  redis_test:
+    image: redis:6.2.6
+    ports:
+      - "9091:6379"
+    command: redis-server --requirepass "xsatnQehpN6WSzgaqetKoZe1SI2axbIx"
+    environment:
+      - REDIS_REPLICATION_MODE=master
