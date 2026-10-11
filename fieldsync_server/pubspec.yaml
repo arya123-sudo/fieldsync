@@ -14,10 +14,7 @@ dependencies:
   serverpod_cloud_storage: 4.0.4
 
   serverpod_offline_sync_client: 0.0.10
-  path_provider: ^2.1.5
   path: ^1.9.1
-  connectivity_plus: ^6.0.0
-  shared_preferences: ^2.3.0
 
 dev_dependencies:
   lints: '>=3.0.0 <7.0.0'
