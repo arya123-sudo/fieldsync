@@ -238,8 +238,15 @@ class _BoardScreenState extends State<BoardScreen> {
       // Fall through and verify via the sync layer instead.
     }
     await _reload();
+    // The new task may take a moment to arrive via the sync stream —
+    // poll briefly before deciding it failed.
+    var created = _tasks.any((t) => t.title == title);
+    for (var i = 0; i < 5 && !created; i++) {
+      await Future.delayed(const Duration(seconds: 1));
+      await _reload();
+      created = _tasks.any((t) => t.title == title);
+    }
     if (!mounted) return;
-    final created = _tasks.any((t) => t.title == title);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
