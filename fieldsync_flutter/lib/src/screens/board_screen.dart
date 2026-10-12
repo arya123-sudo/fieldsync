@@ -43,6 +43,8 @@ class _BoardScreenState extends State<BoardScreen> {
   bool _isSupervisor = true;
   int _navIndex = 0; // 0 = board, 1 = team, 2 = activity
   List<Task> _tasks = [];
+  List<_ActivityItem> _activity = [];
+  bool _activityLoading = false;
   Timer? _refreshTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   bool _syncing = false;
@@ -82,7 +84,35 @@ class _BoardScreenState extends State<BoardScreen> {
       final tasks =
           await _sync.fetchTasks().timeout(const Duration(seconds: 8));
       if (mounted) setState(() => _tasks = tasks);
+      // Refresh the activity feed in the background (no FutureBuilder —
+      // a fresh future on every 3s rebuild would never settle).
+      unawaited(_refreshActivity());
     } catch (_) {}
+  }
+
+  Future<void> _refreshActivity() async {
+    if (_activityLoading) return;
+    _activityLoading = true;
+    try {
+      final out = <_ActivityItem>[];
+      for (final task in _tasks) {
+        if (task.id == null) continue;
+        try {
+          final events = await _sync
+              .fetchEvents(task.id!)
+              .timeout(const Duration(seconds: 5));
+          for (final e in events) {
+            out.add(_ActivityItem(
+                event: e, taskTitle: task.title));
+          }
+        } catch (_) {}
+      }
+      out.sort((a, b) => b.event.createdAt
+          .compareTo(a.event.createdAt));
+      if (mounted) setState(() => _activity = out);
+    } finally {
+      _activityLoading = false;
+    }
   }
 
   Future<void> _restoreAndUploadPendingPhotos() async {
@@ -890,68 +920,38 @@ class _BoardScreenState extends State<BoardScreen> {
   // Built from the synced local DB — no server round-trip needed.
 
   Widget _buildActivityView() {
-    return FutureBuilder<List<_ActivityItem>>(
-      future: _loadActivity(),
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return const Center(
-              child: CircularProgressIndicator());
-        }
-        final items = snap.data!;
-        if (items.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.history_outlined,
-                    size: 48,
-                    color: Colors.grey.shade300),
-                const SizedBox(height: 12),
-                const Text('No activity yet',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _inkSoft)),
-                const SizedBox(height: 6),
-                const Text(
-                    'Assign a task to kick things off.',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: _inkSoft)),
-              ],
-            ),
-          );
-        }
-        return ListView.builder(
-          padding:
-              const EdgeInsets.fromLTRB(28, 8, 28, 28),
-          itemCount: items.length,
-          itemBuilder: (context, i) {
-            final it = items[i];
-            return _activityRow(it);
-          },
-        );
+    if (_activity.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.history_outlined,
+                size: 48,
+                color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+            const Text('No activity yet',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: _inkSoft)),
+            const SizedBox(height: 6),
+            const Text(
+                'Assign a task to kick things off.',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: _inkSoft)),
+          ],
+        ),
+      );
+    }
+    return ListView.builder(
+      padding:
+          const EdgeInsets.fromLTRB(28, 8, 28, 28),
+      itemCount: _activity.length,
+      itemBuilder: (context, i) {
+        return _activityRow(_activity[i]);
       },
     );
-  }
-
-  Future<List<_ActivityItem>> _loadActivity() async {
-    final out = <_ActivityItem>[];
-    for (final task in _tasks) {
-      if (task.id == null) continue;
-      try {
-        final events = await _sync
-            .fetchEvents(task.id!)
-            .timeout(const Duration(seconds: 5));
-        for (final e in events) {
-          out.add(_ActivityItem(
-              event: e, taskTitle: task.title));
-        }
-      } catch (_) {}
-    }
-    out.sort((a, b) => b.event.createdAt
-        .compareTo(a.event.createdAt));
-    return out;
   }
 
   Widget _activityRow(_ActivityItem it) {
@@ -960,7 +960,7 @@ class _BoardScreenState extends State<BoardScreen> {
     Color color;
     switch (e.kind) {
       case 'assigned':
-        icon = Icons.assignment_outlined;
+        icon = Icons.assignment_add_outlined;
         color = const Color(0xFF4F6DF5);
         break;
       case 'started':
