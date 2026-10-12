@@ -219,9 +219,10 @@ class _BoardScreenState extends State<BoardScreen> {
       ),
     );
     if (ok != true) return;
+    final title = titleCtrl.text.trim();
     try {
       await widget.client.task.createTask(
-        title: titleCtrl.text.trim(),
+        title: title,
         assigneeId: demoWorkerId,
         notes: notesCtrl.text.trim().isEmpty
             ? null
@@ -231,14 +232,21 @@ class _BoardScreenState extends State<BoardScreen> {
         escalationAfterMinutes:
             int.tryParse(minutesCtrl.text) ?? 30,
       );
-      await _reload();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Assign failed: $e')),
-        );
-      }
+      // Known issue on the deployed server: createTask succeeds
+      // server-side but the client fails to decode the response.
+      // Fall through and verify via the sync layer instead.
     }
+    await _reload();
+    if (!mounted) return;
+    final created = _tasks.any((t) => t.title == title);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          created ? 'Task assigned' : 'Assign failed — try again',
+        ),
+      ),
+    );
   }
 
   Future<void> _setStatus(
