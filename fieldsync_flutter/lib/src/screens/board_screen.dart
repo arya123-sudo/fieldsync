@@ -21,6 +21,13 @@ const _online = Color(0xFF16A34A);
 const _offline = Color(0xFFDC2626);
 const _amber = Color(0xFFD97706);
 
+// Pairs a TaskEvent with its parent task's title for the activity feed.
+class _ActivityItem {
+  _ActivityItem({required this.event, required this.taskTitle});
+  final TaskEvent event;
+  final String taskTitle;
+}
+
 class BoardScreen extends StatefulWidget {
   final Client client;
   const BoardScreen({super.key, required this.client});
@@ -34,6 +41,7 @@ class _BoardScreenState extends State<BoardScreen> {
   bool _ready = false;
   String? _error;
   bool _isSupervisor = true;
+  int _navIndex = 0; // 0 = board, 1 = team, 2 = activity
   List<Task> _tasks = [];
   Timer? _refreshTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
@@ -459,11 +467,11 @@ class _BoardScreenState extends State<BoardScreen> {
             _navItem(
                 Icons.dashboard_outlined,
                 'Task board',
-                true),
+                0),
             _navItem(Icons.group_outlined, 'Team',
-                false),
+                1),
             _navItem(Icons.history_outlined,
-                'Activity', false),
+                'Activity', 2),
             const Spacer(),
             Padding(
               padding: const EdgeInsets.symmetric(
@@ -575,7 +583,8 @@ class _BoardScreenState extends State<BoardScreen> {
   }
 
   Widget _navItem(
-      IconData icon, String label, bool active) {
+      IconData icon, String label, int index) {
+    final active = _navIndex == index;
     return Padding(
       padding: const EdgeInsets.symmetric(
           horizontal: 12, vertical: 2),
@@ -603,7 +612,8 @@ class _BoardScreenState extends State<BoardScreen> {
                   fontWeight: active
                       ? FontWeight.w600
                       : FontWeight.w400)),
-          onTap: () {},
+          onTap: () =>
+              setState(() => _navIndex = index),
         ),
       ),
     );
@@ -651,6 +661,394 @@ class _BoardScreenState extends State<BoardScreen> {
 
   // ── Header + stats ─────────────────────────────────────────
 
+  // ── Header + stats ─────────────────────────────────────────
+
+  // ── Team view ────────────────────────────────────────────────
+  // Shows every team member with their role and live task stats,
+  // computed from the synced task list (works offline too).
+
+  Widget _buildTeamView() {
+    final members = [
+      {
+        'id': demoSupervisorId,
+        'name': 'Supervisor',
+        'role': 'Assigns work · reviews evidence',
+        'icon': Icons.manage_accounts_outlined,
+        'color': const Color(0xFF4F6DF5),
+      },
+      {
+        'id': demoWorkerId,
+        'name': 'Field Worker',
+        'role': 'Executes tasks · captures evidence',
+        'icon': Icons.handyman_outlined,
+        'color': const Color(0xFF16A34A),
+      },
+    ];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(28, 8, 28, 28),
+      children: [
+        for (final m in members)
+          Builder(builder: (context) {
+            final id = m['id'] as UuidValue;
+            final mine =
+                _tasks.where((t) => t.assigneeId == id).toList();
+            final open =
+                mine.where((t) => t.status == 'open').length;
+            final prog = mine
+                .where((t) => t.status == 'in_progress')
+                .length;
+            final done = mine
+                .where((t) => t.status == 'completed')
+                .length;
+            final isMe = _me == id;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: isMe
+                        ? const Color(0xFF4F6DF5)
+                        : const Color(0xFFE8ECF3),
+                    width: isMe ? 2 : 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: (m['color'] as Color)
+                          .withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(m['icon'] as IconData,
+                        color: m['color'] as Color, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(m['name'] as String,
+                                style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                    color: _ink)),
+                            if (isMe) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4F6DF5)
+                                      .withValues(alpha: 0.12),
+                                  borderRadius:
+                                      BorderRadius.circular(20),
+                                ),
+                                child: const Text('YOU',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight:
+                                            FontWeight.w700,
+                                        color:
+                                            Color(0xFF4F6DF5))),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(m['role'] as String,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                color: _inkSoft)),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _memberStat('$open', 'Open',
+                                const Color(0xFF64748B)),
+                            const SizedBox(width: 16),
+                            _memberStat('$prog',
+                                'In progress',
+                                const Color(0xFF2563EB)),
+                            const SizedBox(width: 16),
+                            _memberStat('$done',
+                                'Completed',
+                                const Color(0xFF16A34A)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _sync.online
+                          ? const Color(0xFF16A34A)
+                              .withValues(alpha: 0.12)
+                          : const Color(0xFFF59E0B)
+                              .withValues(alpha: 0.15),
+                      borderRadius:
+                          BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _sync.online
+                                ? const Color(0xFF16A34A)
+                                : const Color(0xFFF59E0B),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                            _sync.online
+                                ? 'Online'
+                                : 'Offline',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _sync.online
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(
+                                        0xFFB45309))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        Container(
+          margin: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF4F6DF5)
+                .withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: const Color(0xFF4F6DF5)
+                    .withValues(alpha: 0.2)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.offline_bolt_outlined,
+                  color: Color(0xFF4F6DF5), size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Shared team space — every member\'s tasks sync through Serverpod\'s CRDT engine, online or off.',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: _inkSoft,
+                      height: 1.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _memberStat(
+      String value, String label, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value,
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: color)),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12, color: _inkSoft)),
+      ],
+    );
+  }
+
+  // ── Activity view ────────────────────────────────────────────
+  // Global feed of every TaskEvent across all tasks, newest first.
+  // Built from the synced local DB — no server round-trip needed.
+
+  Widget _buildActivityView() {
+    return FutureBuilder<List<_ActivityItem>>(
+      future: _loadActivity(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Center(
+              child: CircularProgressIndicator());
+        }
+        final items = snap.data!;
+        if (items.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.history_outlined,
+                    size: 48,
+                    color: Colors.grey.shade300),
+                const SizedBox(height: 12),
+                const Text('No activity yet',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: _inkSoft)),
+                const SizedBox(height: 6),
+                const Text(
+                    'Assign a task to kick things off.',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: _inkSoft)),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding:
+              const EdgeInsets.fromLTRB(28, 8, 28, 28),
+          itemCount: items.length,
+          itemBuilder: (context, i) {
+            final it = items[i];
+            return _activityRow(it);
+          },
+        );
+      },
+    );
+  }
+
+  Future<List<_ActivityItem>> _loadActivity() async {
+    final out = <_ActivityItem>[];
+    for (final task in _tasks) {
+      if (task.id == null) continue;
+      try {
+        final events = await _sync
+            .fetchEvents(task.id!)
+            .timeout(const Duration(seconds: 5));
+        for (final e in events) {
+          out.add(_ActivityItem(
+              event: e, taskTitle: task.title));
+        }
+      } catch (_) {}
+    }
+    out.sort((a, b) => b.event.createdAt
+        .compareTo(a.event.createdAt));
+    return out;
+  }
+
+  Widget _activityRow(_ActivityItem it) {
+    final e = it.event;
+    IconData icon;
+    Color color;
+    switch (e.kind) {
+      case 'assigned':
+        icon = Icons.assignment_add_outlined;
+        color = const Color(0xFF4F6DF5);
+        break;
+      case 'started':
+        icon = Icons.play_circle_outline;
+        color = const Color(0xFF2563EB);
+        break;
+      case 'note':
+        icon = Icons.note_add_outlined;
+        color = const Color(0xFF7C3AED);
+        break;
+      case 'photo':
+        icon = Icons.photo_camera_outlined;
+        color = const Color(0xFFDB2777);
+        break;
+      case 'completed':
+        icon = Icons.check_circle_outline;
+        color = const Color(0xFF16A34A);
+        break;
+      case 'escalated':
+        icon = Icons.warning_amber_outlined;
+        color = const Color(0xFFDC2626);
+        break;
+      default:
+        icon = Icons.circle_outlined;
+        color = const Color(0xFF64748B);
+    }
+    final time = _formatActivityTime(e.createdAt);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: const Color(0xFFE8ECF3)),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(it.taskTitle,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _ink)),
+                const SizedBox(height: 2),
+                Text(e.message,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: _inkSoft,
+                        height: 1.4)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(time,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade500)),
+        ],
+      ),
+    );
+  }
+
+  String _formatActivityTime(DateTime dt) {
+    final now = DateTime.now().toUtc();
+    final diff = now.difference(dt.toUtc());
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    return '${diff.inDays}d';
+  }
+
   Widget _buildHeader() {
     return Container(
       color: Colors.white,
@@ -668,9 +1066,13 @@ class _BoardScreenState extends State<BoardScreen> {
                       CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isSupervisor
-                          ? 'Operations board'
-                          : 'My assignments',
+                      _navIndex == 1
+                          ? 'Team'
+                          : _navIndex == 2
+                              ? 'Activity'
+                              : _isSupervisor
+                                  ? 'Operations board'
+                                  : 'My assignments',
                       style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
@@ -678,9 +1080,13 @@ class _BoardScreenState extends State<BoardScreen> {
                           letterSpacing: -0.5),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Assign work, track field progress, review evidence — online or off.',
-                      style: TextStyle(
+                    Text(
+                      _navIndex == 1
+                          ? 'Everyone keeping the field running — online or off.'
+                          : _navIndex == 2
+                              ? 'Every assignment, update, note and photo — as it happened.'
+                              : 'Assign work, track field progress, review evidence — online or off.',
+                      style: const TextStyle(
                           fontSize: 13,
                           color: _inkSoft),
                     ),
@@ -1244,7 +1650,11 @@ class _BoardScreenState extends State<BoardScreen> {
                 if (!_sync.online)
                   _offlineBanner(),
                 Expanded(
-                  child: visible.isEmpty
+                  child: _navIndex == 1
+                      ? _buildTeamView()
+                      : _navIndex == 2
+                          ? _buildActivityView()
+                          : visible.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisSize:
@@ -1303,7 +1713,7 @@ class _BoardScreenState extends State<BoardScreen> {
           ),
         ],
       ),
-      floatingActionButton: _isSupervisor
+      floatingActionButton: _isSupervisor && _navIndex == 0
           ? FloatingActionButton.extended(
               key:
                   const ValueKey('assign_task'),
