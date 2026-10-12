@@ -960,7 +960,7 @@ class _BoardScreenState extends State<BoardScreen> {
     Color color;
     switch (e.kind) {
       case 'assigned':
-        icon = Icons.assignment_add_outlined;
+        icon = Icons.assignment_outlined;
         color = const Color(0xFF4F6DF5);
         break;
       case 'started':
