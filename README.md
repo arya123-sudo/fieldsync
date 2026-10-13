@@ -12,10 +12,10 @@ Built for the [Build Something Real: The Serverpod Hackathon](https://builderbas
 ![FieldSync Kanban Board](docs/screenshots/kanban-board.png)
 
 ### Team
-![Team](docs/screenshots/team(1).png)
+![Team](docs/screenshots/team.png)
 
 ### Activity
-![Activity](docs/screenshots/activity(1).png)
+![Activity](docs/screenshots/activity.png)
 
 ### Evidence Timeline
 ![FieldSync Evidence Timeline](docs/screenshots/evidence-timeline.png)
