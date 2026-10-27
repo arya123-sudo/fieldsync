@@ -2,6 +2,9 @@
 
 **Work anywhere. Sync everything.**
 
+🔗 **Live demo:** https://fieldsync.serverpod.space/app/
+🎥 **Demo video:** https://youtu.be/I6a5SK4aNXw
+
 FieldSync is an offline-first maintenance coordination app for field teams. Supervisors assign inspection and repair tasks; technicians keep working with zero connectivity — updating status, adding notes, capturing photo evidence — and everything synchronizes automatically when they're back online.
 
 Built for the [Build Something Real: The Serverpod Hackathon](https://builderbase.com/event/build-something-real-the-serverpod-hackathon).
