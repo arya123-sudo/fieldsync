@@ -7,7 +7,7 @@
 
 FieldSync is an offline-first maintenance coordination app for field teams. Supervisors assign inspection and repair tasks; technicians keep working with zero connectivity — updating status, adding notes, capturing photo evidence — and everything synchronizes automatically when they're back online.
 
-Built for the [Build Something Real: The Serverpod Hackathon](https://builderbase.com/event/build-something-real-the-serverpod-hackathon).
+Built for the [Build Something Real: The Serverpod Hackathon](https://builderbase.com/event/build-something-real-the-serverpod-hackathon) — finished **#30 of ~200 entries**, overall judge score **4.10/5**.
 
 ## Screenshots
 
@@ -27,6 +27,12 @@ Built for the [Build Something Real: The Serverpod Hackathon](https://builderbas
 ## Why it exists
 
 Field workers don't stop working when the internet does. In factories, rural sites, basements, and remote installations, connectivity is a luxury — but the job isn't. FieldSync treats offline as the normal case, not the exception: every task, note, and status change is written to a local CRDT-backed database first, then merged with the team when a connection returns. No spinners, no "retry" buttons, no lost work.
+
+## How conflicts are resolved
+
+Every change is written to the local CRDT-backed database first, so nobody is ever blocked by a bad connection. When a device reconnects, Serverpod's offline sync merges its changes with the team's shared space using CRDT semantics: edits to different parts of a task merge cleanly, and if two people change the same field while offline, the merge resolves deterministically instead of corrupting the record. Nothing is silently lost either way — every assignment, status change, note and photo is preserved in the task's evidence timeline, so a supervisor can always reconstruct what happened, in what order.
+
+Example: Worker A adds the note "Voltage: 231V" offline while Worker B marks the same task complete from another site. On reconnect, the completed task carries A's note — no retry, no overwrite, no lost evidence.
 
 ## What it does
 
@@ -48,14 +54,16 @@ Serverpod isn't glue here — it's the product. The offline merge engine, the sh
 
 ## Run it locally
 
-Prerequisites: Flutter SDK, Dart, Serverpod CLI 4.x.
+Prerequisites: Flutter SDK, Dart, Serverpod CLI 4.x. Clone the repo, then from the project root:
 
-```powershell
+```bash
 # 1. Install dependencies
-cd D:\fieldsync\fieldsync_flutter; flutter pub get
+cd fieldsync_flutter
+flutter pub get
 
 # 2. Generate code and create the migration (from the project root)
-cd D:\fieldsync; serverpod generate
+cd ..
+serverpod generate
 serverpod create-migration
 
 # 3. Start everything (server + embedded Postgres + Flutter web)
@@ -65,7 +73,7 @@ serverpod start
 Open the "Fieldsync app running at" URL from the log. No `config/passwords.yaml`? Create one:
 
 ```yaml
-# D:\fieldsync\fieldsync_server\config\passwords.yaml
+# fieldsync_server/config/passwords.yaml
 development:
   database: 'pick-a-local-password'
 ```
@@ -99,4 +107,4 @@ Per the hackathon rules: this project was built with AI assistance (code generat
 
 ## Team
 
-Arya Yaligar + teammate — 2-member team.
+Arya Yaligar and Sanjana T D — team "Vibe and theme".
